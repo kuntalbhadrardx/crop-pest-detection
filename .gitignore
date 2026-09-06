@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Env / secrets
+.env
+
+# App data: model weights, uploads, datasets, SQLite db, training runs
+models/*
+!models/.gitkeep
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
+runs/
+
+# Ultralytics artifacts
+*.pt
+*.onnx
+
+# Misc
+.DS_Store
+.pytest_cache/
+.coverage
+htmlcov/

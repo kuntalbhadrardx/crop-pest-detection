@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crop Pest &amp; Disease Detector</title>
+<style>
+  :root {
+    --bg: #0f1720; --panel: #17222e; --panel2: #1e2c3a; --line: #2c3e50;
+    --text: #e6edf3; --muted: #93a4b5; --accent: #38bdf8; --good: #34d399; --bad: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; margin: 0; letter-spacing: .3px; }
+  header .api { margin-left: auto; font-size: 12px; color: var(--muted); }
+  header .api code { color: var(--accent); background: var(--panel); padding: 2px 6px; border-radius: 6px; }
+
+  #drop {
+    margin-top: 18px; border: 2px dashed var(--line); border-radius: 14px;
+    background: var(--panel); padding: 34px 20px; text-align: center;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  #drop.drag, #drop:hover { border-color: var(--accent); background: var(--panel2); }
+  #drop .big { font-size: 15px; }
+  #drop .hint { color: var(--muted); font-size: 12.5px; margin-top: 6px; }
+  #drop input[type=file] { display: none; }
+
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; align-items: flex-start; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px; flex: 1 1 460px;
+  }
+  .card h2 { font-size: 14px; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+
+  #result { display: none; }
+  .stage { position: relative; line-height: 0; }
+  #stage { width: 100%; height: auto; border-radius: 8px; background: #000; }
+  #canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .badge-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .badge {
+    padding: 6px 14px; border-radius: 999px; font-size: 13.5px; font-weight: 600;
+    border: 1px solid var(--line);
+  }
+  .badge.affected { background: rgba(248,113,113,.12); color: var(--bad); border-color: var(--bad); }
+  .badge.healthy  { background: rgba(52,211,153,.12); color: var(--good); border-color: var(--good); }
+  .badge.waiting  { background: rgba(56,189,248,.12); color: var(--accent); border-color: var(--accent); }
+  .meta { font-size: 12.5px; color: var(--muted); }
+
+  ul#detlist { list-style: none; margin: 10px 0 0; padding: 0; }
+  ul#detlist li {
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+    background: var(--panel2); border-radius: 8px; margin-bottom: 6px; font-size: 13.5px;
+  }
+  .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .conf { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .nobar { margin-left: auto; }
+
+  .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button, .linkbtn {
+    font: inherit; font-size: 13.5px; font-weight: 600; color: #0b1220;
+    background: var(--accent); border: none; border-radius: 9px; padding: 9px 16px;
+    cursor: pointer; text-decoration: none;
+  }
+  button.secondary, .linkbtn.secondary {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+  }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  #error {
+    display: none; margin-top: 14px; background: rgba(248,113,113,.1);
+    border: 1px solid var(--bad); color: var(--bad); padding: 10px 14px;
+    border-radius: 10px; font-size: 13.5px; white-space: pre-wrap;
+  }
+  #loading { display: none; color: var(--muted); font-size: 13.5px; margin-top: 14px; }
+  .spinner {
+    display: inline-block; width: 14px; height: 14px; border: 2px solid var(--line);
+    border-top-color: var(--accent); border-radius: 50%; vertical-align: -2px; margin-right: 8px;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { margin-top: 28px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🌾 Crop Pest &amp; Disease Detector</h1>
+    <span class="api">API <code>POST /api/detect</code></span>
+  </header>
+
+  <div id="drop">
+    <input type="file" id="file" accept="image/*">
+    <div class="big">Click or drag a crop photo here</div>
+    <div class="hint">JPG / PNG / WEBP up to 20 MB — the model scans it for pests &amp; diseases</div>
+  </div>
+
+  <div id="error"></div>
+  <div id="loading"><span class="spinner"></span>Running detection… this can take a few seconds</div>
+
+  <section id="result" class="row">
+    <div class="card">
+      <div class="badge-row">
+        <span id="badge" class="badge">—</span>
+        <span id="meta" class="meta"></span>
+      </div>
+      <div class="stage">
+        <img id="stage" alt="uploaded crop photo">
+        <canvas id="canvas"></canvas>
+      </div>
+      <div class="actions">
+        <button id="again" class="secondary">Scan another photo</button>
+        <a id="annotated-link" class="linkbtn secondary" target="_blank" rel="noopener">View server-annotated image ↗</a>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Detections</h2>
+      <p id="nodets" style="color:var(--muted);font-size:13.5px;margin:0;">No detections above the confidence threshold.</p>
+      <ul id="detlist"></ul>
+    </div>
+  </section>
+
+  <footer>
+    Status: <span id="modelnote">checking…</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const drop = document.getElementById("drop");
+  const fileInput = document.getElementById("file");
+  const errorBox = document.getElementById("error");
+  const loading = document.getElementById("loading");
+  const result = document.getElementById("result");
+  const badge = document.getElementById("badge");
+  const meta = document.getElementById("meta");
+  const imgEl = document.getElementById("stage");
+  const canvas = document.getElementById("canvas");
+  const detlist = document.getElementById("detlist");
+  const nodets = document.getElementById("nodets");
+  const annotatedLink = document.getElementById("annotated-link");
+  const modelnote = document.getElementById("modelnote");
+  const MAX_MB = 20;
+
+  // ---- helpers -----------------------------------------------------------
+  function colorFor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+    return h;
+  }
+  function detailText(d) {
+    if (typeof d === "string") return d;
+    if (Array.isArray(d) && d[0] && d[0].msg) return d.map((e) => e.msg).join("\n");
+    if (d && d.detail) return detailText(d.detail);
+    return "Something went wrong.";
+  }
+  function showError(msg) { errorBox.textContent = msg; errorBox.style.display = "block"; }
+  function clearError() { errorBox.style.display = "none"; }
+  function setBusy(on) {
+    loading.style.display = on ? "block" : "none";
+    drop.style.opacity = on ? 0.45 : 1;
+    drop.style.pointerEvents = on ? "none" : "auto";
+  }
+
+  // ---- file picking ------------------------------------------------------
+  function pick(file) {
+    clearError();
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { showError("Please choose an image file (JPG, PNG, WEBP…)."); return; }
+    if (file.size > MAX_MB * 1024 * 1024) { showError("This image is larger than the " + MAX_MB + " MB limit."); return; }
+    runScan(file);
+  }
+  fileInput.addEventListener("change", () => pick(fileInput.files[0]));
+  drop.addEventListener("click", () => fileInput.click());
+  ["dragenter", "dragover"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+  ["dragleave", "drop"].forEach((ev) =>
+    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
+  drop.addEventListener("drop", (e) => pick(e.dataTransfer.files[0]));
+  document.getElementById("again").addEventListener("click", () => {
+    result.style.display = "none"; fileInput.value = ""; drop.style.display = ""; drop.style.opacity = "";
+  });
+
+  // ---- scan + draw -------------------------------------------------------
+  async function runScan(file) {
+    clearError(); setBusy(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const resp = await fetch("/api/detect", { method: "POST", body: fd });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(detailText(data));
+      drawResult(file, data);
+    } catch (err) {
+      showError(err && err.message ? err.message : "Network error — is the API running?");
+      setBusy(false);
+    }
+  }
+
+  async function drawResult(file, data) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      result.style.display = "flex";
+      drop.style.display = "none";
+      canvas.width = data.image_width;
+      canvas.height = data.image_height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+
+      const dets = data.detections || [];
+      const affected = data.status !== "healthy";
+      badge.className = "badge " + (affected ? "affected" : "healthy");
+      badge.textContent = affected
+        ? "⚠ Pests / disease found (" + dets.length + ")"
+        : "✓ Looks healthy — no pests detected";
+
+      const scale = Math.max(13, Math.round(canvas.width * 0.019));
+      const labelH = Math.max(19, Math.round(canvas.width * 0.026));
+      ctx.lineWidth = Math.max(2, Math.round(canvas.width * 0.0035));
+      ctx.font = scale + "px system-ui, sans-serif";
+
+      dets.forEach((d) => {
+        const b = d.bbox, hue = colorFor(d.class_name);
+        ctx.strokeStyle = "hsl(" + hue + " 85% 55%)";
+        ctx.strokeRect(b.x, b.y, b.width, b.height);
+        ctx.fillStyle = "hsl(" + hue + " 85% 45% / .9)";
+        const label = d.class_name + "  " + Math.round(d.confidence * 100) + "%";
+        const tw = ctx.measureText(label).width + 10;
+        const ly = b.y - labelH >= 0 ? b.y - labelH : b.y;
+        ctx.fillRect(b.x, ly, tw, labelH);
+        ctx.fillStyle = "#fff";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, b.x + 5, ly + labelH / 2 + 1);
+      });
+
+      detlist.innerHTML = "";
+      nodets.style.display = dets.length ? "none" : "block";
+      dets.forEach((d) => {
+        const li = document.createElement("li");
+        const sw = document.createElement("span");
+        sw.className = "sw";
+        sw.style.background = "hsl(" + colorFor(d.class_name) + " 85% 55%)";
+        const name = document.createElement("span");
+        name.textContent = d.class_name;
+        const conf = document.createElement("span");
+        conf.className = "conf";
+        conf.textContent = Math.round(d.confidence * 100) + "%";
+        li.append(sw, name, conf);
+        detlist.appendChild(li);
+      });
+
+      meta.textContent = "model " + data.model_version + " · " + data.image_width + "×" + data.image_height +
+        " · scan #" + data.id;
+      annotatedLink.href = data.annotated_url || "#";
+      annotatedLink.style.display = data.annotated_url ? "" : "none";
+      URL.revokeObjectURL(url);
+      setBusy(false);
+    };
+    img.onerror = () => { showError("Could not load the selected image."); URL.revokeObjectURL(url); setBusy(false); };
+    img.src = url;
+  }
+
+  // Expose for tests / console: window.__scan(file)
+  window.__scan = runScan;
+
+  // ---- health note -------------------------------------------------------
+  fetch("/api/health")
+    .then((r) => r.json())
+    .then((h) => {
+      modelnote.textContent = h.model_loaded
+        ? (h.fallback_in_use
+            ? "generic fallback model (yolov8n) — train a pest model for real results"
+            : "custom model loaded — " + h.model_version)
+        : "model not loaded: " + (h.error || "unknown");
+    })
+    .catch(() => { modelnote.textContent = "API unreachable — is the server running?"; });
+})();
+</script>
+</body>
+</html>

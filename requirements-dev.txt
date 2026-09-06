@@ -1,0 +1,13 @@
+# Lightweight deps to run the API + tests WITHOUT the ML stack.
+# The YOLO model is imported lazily, so ultralytics/torch are only needed for
+# real inference and training (install requirements.txt for that).
+# Python 3.10+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+SQLAlchemy>=2.0.25
+pydantic>=2.6
+pydantic-settings>=2.2
+Pillow>=10.0
+pytest>=8.0
+httpx>=0.27

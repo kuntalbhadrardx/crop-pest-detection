@@ -1,0 +1,12 @@
+# Full runtime (inference + training). Pulls in PyTorch (~1-2 GB), so read the
+# README "Installation" section for CPU vs GPU notes before installing.
+# Python 3.10+
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-multipart>=0.0.9
+SQLAlchemy>=2.0.25
+pydantic>=2.6
+pydantic-settings>=2.2
+Pillow>=10.0
+ultralytics>=8.2
+roboflow>=1.1.39
