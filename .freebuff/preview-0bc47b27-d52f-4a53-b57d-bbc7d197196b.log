@@ -1,9 +1,0 @@
-INFO:     127.0.0.1:34062 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:34078 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:34090 - "GET /docs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:60998 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:32774 - "GET / HTTP/1.1" 200 OK
-INFO:     127.0.0.1:32774 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51632 - "GET /api/scans/1/image HTTP/1.1" 200 OK
-INFO:     127.0.0.1:51632 - "POST /api/detect HTTP/1.1" 201 Created
-INFO:     127.0.0.1:56146 - "POST /api/detect HTTP/1.1" 201 Created

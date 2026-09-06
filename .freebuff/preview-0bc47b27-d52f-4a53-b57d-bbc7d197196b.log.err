@@ -1,8 +1,0 @@
-INFO:     Started server process [321]
-INFO:     Waiting for application startup.
-WARNING app.detector: No custom model at /mnt/c/Users/kunta/OneDrive/Documents/crop pest detection/models/custom.pt — falling back to pretrained yolov8n.pt (auto-downloaded on first run). Train one with scripts/train.py.
-INFO app.main: YOLO model ready: yolov8n.pt (pretrained fallback) on cpu — 80 classes
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO app.routers.detect: Scan 2 stored: sample.jpg (2 detection(s), status=affected)
-INFO app.routers.detect: Scan 3 stored: sample.jpg (2 detection(s), status=affected)
