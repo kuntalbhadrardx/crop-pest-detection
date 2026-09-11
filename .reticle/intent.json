@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "intents": {
+    "flow:farmer-scan-journey": {
+      "id": "flow:farmer-scan-journey",
+      "statement": "A farmer uploads a crop photo in the web app; the photo is POSTed to /api/detect and the app itself signals scan:result when the detection result is rendered. Proves the core scan journey end to end.",
+      "state": "proved",
+      "declaredAt": 1789068857361,
+      "binding": {
+        "flow": "farmer-scan-journey"
+      },
+      "surface": {
+        "flow": "farmer-scan-journey"
+      },
+      "amended": [
+        {
+          "statement": "A farmer uploads a crop photo in the web app; the photo is sent to the detection API and the app shows the result (status badge + advisory). Proves the core scan journey works against the real DOM and network.",
+          "at": 1789067488897
+        }
+      ],
+      "provenBy": {
+        "verdictId": "flow_replay:farmer-scan-journey:1789068932550",
+        "grade": "asserted",
+        "at": 1789068932550
+      }
+    }
+  }
+}

@@ -4,7 +4,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from PIL import Image
 from sqlalchemy.orm import Session
 
@@ -73,6 +73,11 @@ def detect_image(
     request: Request,
     db: Session = Depends(get_db),
     file: UploadFile = File(..., description="Crop image file"),
+    location_name: str | None = Form(None, description="Village/town name (optional)"),
+    latitude: float | None = Form(None, ge=-90, le=90),
+    longitude: float | None = Form(None, ge=-180, le=180),
+    crop: str | None = Form(None, description="Crop name, e.g. rice, tomato"),
+    crop_stage: str | None = Form(None, description="Growth stage, e.g. flowering"),
 ) -> ScanDetail:
     detector: Detector = request.app.state.detector
     if not detector.available:
@@ -116,6 +121,11 @@ def detect_image(
         annotated_path=_rel(annotated) if result["annotated_path"] else None,
         image_width=result["image_width"],
         image_height=result["image_height"],
+        latitude=latitude,
+        longitude=longitude,
+        location_name=(location_name or "")[:255] or None,
+        crop=(crop or "")[:100] or None,
+        crop_stage=(crop_stage or "")[:50] or None,
     )
     for d in detections:
         scan.detections.append(

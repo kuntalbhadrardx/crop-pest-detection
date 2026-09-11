@@ -6,12 +6,24 @@ the scan with every detection into a SQLite history, and returns pixel bounding
 boxes a frontend can draw on the image. Includes a training pipeline so you can
 fine-tune YOLO on your own pest/disease dataset.
 
+On top of detection, the platform adds a full crop-health intelligence layer:
+weather-based **risk forecasting**, **multilingual IPM advisories** (English,
+Hindi, Marathi, Tamil, Telugu), **field reports**, **expert validation** with a
+learning loop back into training, **geospatial hotspot mapping** and an
+**officials dashboard**.
+
 ## Features
 
-- `POST /api/detect` — image upload → detection result (status, class, confidence, bbox)
+- `POST /api/detect` — image upload + field context (location, crop, stage) → detections + stored scan
+- **Weather risk forecasting** — per-pest risk from the Open-Meteo forecast + recent local outbreaks (cached on disk for offline use, provider is swappable)
+- **Multilingual advisories** — IPM management steps, safe pesticide use, expert referral and follow-up schedules in en/hi/mr/ta/te (local JSON, works offline)
+- **Field reports** — farmer/extension observations without a photo, feeding risk + hotspots
+- **Expert validation** — confirm / reject / needs-lab verdicts on scans and reports
+- **Learning loop** — `scripts/export_training.py` turns expert-confirmed scans into a YOLO dataset for retraining
+- **Hotspots & dashboard** — grid-clustered outbreak map + trend/top-pest statistics
 - **Scan history** — every scan stored in SQLite with the original + annotated image
 - **Training pipeline** — Roboflow dataset download + `train.py` → `models/custom.pt`
-- Model auto-fallback — runs with a stock YOLOv8n until you train your own weights
+- Model auto-fallback — runs with a stock YOLOv8n until you train your own weights (a corrupt/empty `custom.pt` no longer takes the service down)
 - CORS enabled — plug in any web frontend later
 
 ## Project layout
@@ -20,21 +32,34 @@ fine-tune YOLO on your own pest/disease dataset.
 app/
   main.py            FastAPI app, CORS, startup (loads model once)
   config.py          Settings from .env / environment variables
-  database.py        SQLite engine + session
-  models.py          Scan + Detection tables
+  database.py        SQLite engine + session + lightweight migrations
+  models.py          Scan, Detection, FieldReport, ExpertReview tables
   schemas.py         Response models + serializers
-  detector.py        YOLO wrapper (lazy ultralytics import)
+  detector.py        YOLO wrapper (lazy ultralytics import, resilient fallback)
   routers/
-    detect.py        POST /api/detect
+    detect.py        POST /api/detect (+ location/crop/stage form fields)
     scans.py         history + image endpoints
     info.py          /api/health, /api/classes
+    risk.py          GET /api/risk — weather-based pest risk
+    advisories.py    GET /api/advisory, /api/advisories, /api/languages
+    reports.py       POST/GET /api/reports — field observations
+    reviews.py       POST/GET /api/reviews — expert verdicts + pending queue
+    insights.py      GET /api/hotspots, /api/stats/summary
+  services/
+    weather.py       WeatherProvider interface + Open-Meteo + disk cache
+    risk.py          Rule engine over data/pest_rules.json
+    advisory.py      Localized advisory lookup over data/advisories.json
+    geo.py           Haversine distance helper
 scripts/
   train.py                 Train YOLO on your dataset
   download_roboflow.py     Pull a dataset from Roboflow
+  export_training.py       Export expert-validated scans as a YOLO dataset
   make_sample.py           Generate a test image
 models/              custom.pt  (your trained weights — used at startup)
 uploads/             original + annotated images
-data/                datasets + scans.db (SQLite)
+data/                datasets, scans.db, pest_rules.json, advisories.json
+static/index.html    Plain-HTML upload page (served at /)
+streamlit_app.py     Role-based UI: scan, risk, reports, review, dashboard
 ```
 
 ## Requirements
@@ -124,6 +149,16 @@ threshold is not in `HEALTHY_CLASSES`, otherwise `healthy`.
 | GET | `/api/scans/{id}/annotated` | The image with YOLO boxes drawn |
 | GET | `/api/health` | Model loaded? weights? device? error? |
 | GET | `/api/classes` | Class names the loaded model detects |
+| GET | `/api/risk?location=&crop=&crop_stage=` | Weather-based per-pest risk (or `?lat=&lon=`) |
+| GET | `/api/advisory?class_name=&lang=` | Localized IPM advisory (en/hi/mr/ta/te) |
+| GET | `/api/advisories` | List advisory targets |
+| GET | `/api/languages` | Supported advisory languages |
+| POST | `/api/reports` | Submit a field observation (JSON) |
+| GET | `/api/reports` | List field reports |
+| POST | `/api/reviews` | Expert verdict on a scan or report |
+| GET | `/api/reviews/pending` | Validation queue (unreviewed scans) |
+| GET | `/api/hotspots?days=14` | Grid-clustered outbreak hotspots |
+| GET | `/api/stats/summary` | Dashboard totals, top pests, 14-day trend |
 
 ## Training your own model
 
@@ -195,7 +230,137 @@ differ.
 | `MAX_UPLOAD_MB` | `20` | Max upload size |
 | `HEALTHY_CLASSES` | `[]` | Classes that never trigger "affected" |
 | `CORS_ORIGINS` | `["*"]` | Allowed browser origins (JSON list) |
+| `WEATHER_PROVIDER` | `open-meteo` | Weather source (swappable; offline sources can be added) |
+| `WEATHER_CACHE_TTL_HOURS` | `24` | How long a forecast stays fresh on disk |
+| `WEATHER_CACHE_PATH` | `data/weather_cache.json` | Forecast cache (offline lifeline) |
 | `ROBOFLOW_API_KEY` | *(empty)* | For `scripts/download_roboflow.py` |
+
+## Streamlit frontend (optional)
+
+A role-based UI that talks to the same API over HTTP — **no ML stack needed on
+the machine running it**. Sign in as Farmer, Extension worker or Official to get
+different pages:
+
+- **🔎 Scan crop** — photo + village/GPS + crop/stage → detection boxes, then a
+  **localized advisory panel** (language picked in the sidebar) with IPM steps,
+  safe-use warnings and follow-up schedule
+- **🌦 Risk forecast** — per-pest risk for any village with the weather drivers
+  behind every score
+- **📝 Field report** — observations without a photo
+- **✅ Expert review** — confirm / reject / needs-lab on scans and reports
+- **📊 Dashboard** — hotspots map, 14-day trend, top pests (officials)
+
+```bash
+pip install -r requirements.txt            # adds streamlit + requests
+streamlit run streamlit_app.py              # UI on http://127.0.0.1:8501
+```
+
+Start the FastAPI backend first (`uvicorn app.main:app`). Point the sidebar
+"API URL" at a different backend to use a remote server, or set the
+`API_URL` env var.
+
+## Learning loop (expert validation → retraining)
+
+1. Experts review scans via `POST /api/reviews` (verdict `confirmed`,
+   `rejected` or `needs_lab`) or in the Streamlit Expert review page.
+2. Export the validated data as a YOLO dataset:
+
+   ```bash
+   python scripts/export_training.py --out data/expert_dataset
+   ```
+
+   Confirmed scans become labeled images (with any corrected class applied);
+   rejected scans become background images.
+3. Retrain and the API picks the new weights up on restart:
+
+   ```bash
+   python scripts/train.py --data data/expert_dataset/data.yaml --epochs 50
+   ```
+
+## Offline readiness
+
+The system is designed to degrade gracefully without internet:
+
+- **Advisories, risk rules and languages** are local JSON files — always work.
+- **Weather** is cached to `data/weather_cache.json` for 24 h; after one
+  successful fetch per location, forecasts keep working offline (responses are
+  flagged `weather_stale`).
+- The `WeatherProvider` interface (`app/services/weather.py`) is the single
+  integration point for a future fully-offline source (manual entry, on-farm
+  sensors, bundled climatology tables) — implement the two methods and set
+  `WEATHER_PROVIDER`.
+
+## Android app & full offline mode (PWA)
+
+The web page at `http://<server>:8000/` is an installable **Progressive Web
+App** — open it once on an Android phone and it becomes an app with a
+home-screen icon, running full-screen like a native app.
+
+**Install (one time, needs the server reachable):**
+
+1. On the phone, open Chrome and go to `http://<your-PC-IP>:8000/`
+   (find the PC's IP with `ipconfig`; the API must be started with
+   `--host 0.0.0.0` to accept LAN connections).
+2. Tap the **"Install app"** banner (or Chrome menu → *Add to Home screen*).
+   On iPhone: *Share → Add to Home Screen*.
+
+**What works offline (no internet, no server):**
+
+- Taking/uploading crop photos and scanning them into the **offline queue**.
+- The **advisory library** in all 5 languages and the **risk rules**, cached
+  from `GET /api/offline/bundle` (ETag-based, refreshed at most daily).
+- Previously cached pages — the app shell survives airplane mode.
+
+**When connectivity returns** (Background Sync, or the "Try syncing now"
+button), queued scans replay automatically as normal `POST /api/detect`
+calls — with their field context — and land in the server's scan history,
+feeding the dashboard, hotspots and expert review like any other scan.
+
+**Limits:** detection inference itself always runs on the server, so queued
+scans show results only after sync. Fully serverless on-device inference would
+need a native app with TensorFlow Lite (see Next steps).
+
+Files: `static/manifest.webmanifest`, `static/sw.js`, `static/offline.html`,
+`static/icons/`, and the `offline` router (`app/routers/offline.py`).
+
+## One-command start (Windows)
+
+Start both the API and Streamlit together, wait for them, and open the browser:
+
+- **Double-click `start.bat`** — runs both servers and opens `http://127.0.0.1:8501`.
+- **Double-click `stop.bat`** — shuts both down.
+
+Both are idempotent: re-running `start.bat` when the servers are already up
+just reports "already running". The servers detach, so you can close the
+console window and they keep running. From WSL directly, use
+`wsl -d Ubuntu-26.04 -- bash ./run_all.sh`.
+
+> If ports stop answering after a WSL restart, run `wsl --shutdown` then
+> `start.bat` again — that rebuilds localhost forwarding.
+
+## Verification with Reticle (browser-level)
+
+The repo is wired to [Reticle](https://docs.reticle.sh) — an MCP server that
+verifies the running app from inside the real browser (DOM, network, console)
+and returns a verdict, not a screenshot. The repo is linked to the Reticle
+Cloud workspace (`project: default`); `verify` runs auto-push there.
+
+- **Saved flow:** `.reticle/flows/default/farmer-scan-journey.json` — the core
+  journey *farmer uploads a crop photo → POST /api/detect → app signals
+  `scan:result` when the result renders*. The app fires that signal itself
+  (`reticle.signal`), which is the strongest evidence grade Reticle offers.
+- **Replay the flow** (headless, exit code 0 = pass):
+  ```bash
+  # inside WSL, project root, with Node on PATH (see .reticle-tools/):
+  npx @reticlehq/server verify http://127.0.0.1:8000/ --timeout 60000
+  ```
+- **Interactive driving**: start the daemon (`npx @reticlehq/server serve`),
+  then use the `reticle_*` MCP tools from your coding agent, or the small HTTP
+  client at `.reticle-tools/reticle_client.mjs` (docs: HTTP transport).
+- **Setup notes**: the SDK is vendored at `static/vendor/reticle.js`
+  (@reticlehq/browser@2.13.1) and connects only on localhost/127.0.0.1 —
+  phones using the PWA never load it. `data-testid` attributes on the upload
+  input, status badge and detection list are Reticle's stable anchors.
 
 ## Tests
 
@@ -206,12 +371,16 @@ pytest -q
 
 The suite stubs the YOLO model, so it runs without PyTorch/ultralytics while
 still exercising upload validation, inference storage, history listing, image
-serving, and error paths.
+serving, error paths — plus the risk engine, advisories in every language,
+field reports, expert reviews, hotspots and dashboard stats.
 
 ## Next steps / ideas
 
-- Frontend: upload form + draw the returned boxes on the image (`<canvas>`),
-  list history with thumbnails.
+- Train a real pest model (the current fallback returns generic COCO classes).
+- Swap in an offline weather provider for full no-internet operation.
 - Add user accounts so each farmer/field keeps its own history.
-- Run inference on a GPU server or containerize with Docker.
+- Ship the detector **on-device**: export the trained model to TensorFlow Lite
+  and build an Android wrapper (Capacitor/TWA) around this same UI — then
+  detection itself works with no server at all.
+- Push hotspots to officials via SMS/WhatsApp notifications.
 - Export the trained model to ONNX/TensorRT for faster, lighter deployment.

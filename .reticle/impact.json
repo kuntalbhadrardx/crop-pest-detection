@@ -1,0 +1,71 @@
+{
+  "counts": {
+    "calls": 61,
+    "verdicts": 10,
+    "passed": 5,
+    "failed": 4,
+    "unknown": 1,
+    "refusals": 0,
+    "marks": 0,
+    "sessions": 6,
+    "tokensReturned": 35659,
+    "drivingMs": 276343
+  },
+  "days": [
+    {
+      "date": "2026-09-10",
+      "counts": {
+        "calls": 61,
+        "verdicts": 10,
+        "passed": 5,
+        "failed": 4,
+        "unknown": 1,
+        "refusals": 0,
+        "marks": 0,
+        "sessions": 6,
+        "tokensReturned": 35659,
+        "drivingMs": 276343
+      }
+    }
+  ],
+  "records": {
+    "longestRunMs": 0,
+    "bestVerdictDay": 10,
+    "bestDefectDay": 4,
+    "streakDays": 1,
+    "bestStreakDays": 1
+  },
+  "savings": {
+    "tokens": {
+      "value": 0,
+      "basis": "vs an agent reading the app through screenshots"
+    },
+    "minutes": {
+      "value": 16,
+      "basis": "vs one re-prompt cycle per defect caught"
+    }
+  },
+  "since": 1789066706972,
+  "defects": [
+    {
+      "at": 1789068489457,
+      "title": "scan-file-input",
+      "detail": "no signal matched {\"kind\":\"signal\",\"name\":\"scan:result\"}"
+    },
+    {
+      "at": 1789068187912,
+      "title": "scan-file-input",
+      "detail": "no signal matched {\"kind\":\"signal\",\"name\":\"scan:result\"}"
+    },
+    {
+      "at": 1789067975949,
+      "title": "scan-file-input",
+      "detail": "no signal matched {\"kind\":\"signal\",\"name\":\"scan:result\"}"
+    },
+    {
+      "at": 1789067906129,
+      "title": "scan-file-input",
+      "detail": "no signal matched {\"kind\":\"signal\",\"name\":\"scan:result\"}"
+    }
+  ]
+}

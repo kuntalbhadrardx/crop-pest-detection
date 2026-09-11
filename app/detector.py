@@ -56,29 +56,45 @@ class Detector:
             ) from exc
 
         model_path = Path(self.settings.model_path)
-        if model_path.exists():
+        source = self.settings.fallback_model
+        if model_path.exists() and model_path.stat().st_size > 0:
             source = str(model_path)
             self.model_version = model_path.name
             self.is_fallback = False
             logger.info("Loading custom YOLO model: %s", model_path)
         else:
-            source = self.settings.fallback_model
             self.model_version = self.settings.fallback_model
             self.is_fallback = True
             logger.warning(
-                "No custom model at %s — falling back to pretrained %s "
+                "No usable custom model at %s — falling back to pretrained %s "
                 "(auto-downloaded on first run). Train one with scripts/train.py.",
                 model_path,
                 source,
             )
 
-        self.model = YOLO(source)
-
         try:
-            device = getattr(self.model, "device", None)
-            self.device = str(device) if device else (self.settings.device or "auto")
-        except Exception:  # device not resolved until first inference
-            self.device = self.settings.device or "auto"
+            self.model = YOLO(source)
+        except Exception as exc:
+            if self.is_fallback:
+                raise  # nothing else to fall back to
+            # A corrupt/stale custom.pt must not take the whole service down.
+            logger.error(
+                "Custom model %s failed to load (%s: %s) — falling back to %s",
+                source,
+                type(exc).__name__,
+                exc,
+                self.settings.fallback_model,
+            )
+            self.model_version = self.settings.fallback_model
+            self.is_fallback = True
+            self.model = YOLO(self.settings.fallback_model)
+
+        device = self.settings.device
+        if not device or device == "auto":
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model.to(device)
+        self.device = device
 
     # -- inference -------------------------------------------------------
     def predict(self, image_path: Path | str, annotated_path: Path | str | None = None) -> dict:

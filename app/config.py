@@ -39,10 +39,17 @@ class Settings(BaseSettings):
     healthy_classes: list[str] = []
     cors_origins: list[str] = ["*"]
 
+    # --- Weather / risk forecasting --------------------------------------
+    # Provider is swappable so a future offline source (manual entry, sensors)
+    # can replace open-meteo without touching the risk engine.
+    weather_provider: str = "open-meteo"
+    weather_cache_ttl_hours: int = 24
+    weather_cache_path: Path = BASE_DIR / "data" / "weather_cache.json"
+
     # --- Dataset downloads (training only) ------------------------------
     roboflow_api_key: str = ""
 
-    @field_validator("model_path", "upload_dir", mode="before")
+    @field_validator("model_path", "upload_dir", "weather_cache_path", mode="before")
     @classmethod
     def _resolve_relative_paths(cls, value: Path | str) -> Path:
         """Resolve path settings that point outside/relative to the project root."""

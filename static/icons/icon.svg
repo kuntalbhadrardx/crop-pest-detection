@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Crop Doctor icon: a leaf inside a shield on a dark field -->
+  <rect width="512" height="512" rx="96" fill="#0f1720"/>
+  <path d="M256 96c-88 10-144 66-144 150 0 66 46 122 108 138 8 2 14-6 10-13-14-24-20-50-18-77 1-14 21-15 23-1 4 34 18 62 44 84 6 5 15 1 14-7-3-32 3-61 20-88 4-7 15-4 14 4-4 44 4 84 26 121 5 8 17 4 15-5-10-42-12-83-5-125 2-11-3-22-13-27-30-16-63-24-94-24z" fill="#34d399"/>
+  <path d="M256 132c-64 8-104 48-104 110 0 48 34 90 79 102-10-22-15-45-14-69 1-18 28-20 32-2 5 28 16 51 36 70 5-40 19-74 44-103 5-6 2-16-6-16-22-1-45 2-67 8z" fill="#0f1720" opacity="0.35"/>
+  <circle cx="352" cy="150" r="34" fill="#38bdf8"/>
+  <path d="M340 150l9 10 17-20" stroke="#0f1720" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

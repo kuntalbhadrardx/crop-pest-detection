@@ -1,0 +1,5 @@
+{
+  "framework": "plain",
+  "projectId": "default",
+  "note": "Plain-HTML app served by FastAPI on :8000 (WSL Ubuntu). SDK embedded manually in static/index.html from @reticlehq/browser@2.13.1 (vendored at static/vendor/reticle.js) because reticle init has no vite/next config to hook here. See docs.reticle.sh/install-manual.md."
+}

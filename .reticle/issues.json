@@ -1,0 +1,10 @@
+{
+  "triage": {
+    "592ebc69606405ace362f2c59f2371d4": {
+      "status": "open",
+      "flowName": "farmer-scan-journey",
+      "title": "Flow \"farmer-scan-journey\": upload needs the file described as args: { name, content?, type? } — upload does not read path, so it would be dropped. To upload a file from disk, use the reticle daemon w",
+      "at": 1789067733672
+    }
+  }
+}

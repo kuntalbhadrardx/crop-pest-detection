@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Crop Pest &amp; Disease Detector</title>
+<meta name="theme-color" content="#0f1720">
+<meta name="description" content="Detect crop pests and diseases from photos — works offline.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<link rel="apple-touch-icon" href="/icons/icon.svg">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
   :root {
     --bg: #0f1720; --panel: #17222e; --panel2: #1e2c3a; --line: #2c3e50;
@@ -21,8 +29,16 @@
   header .api { margin-left: auto; font-size: 12px; color: var(--muted); }
   header .api code { color: var(--accent); background: var(--panel); padding: 2px 6px; border-radius: 6px; }
 
+  #netbanner {
+    display: none; margin-top: 12px; padding: 9px 14px; border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    background: rgba(248,181,0,.12); border: 1px solid #f5b301; color: #f5b301;
+  }
+  #netbanner.offline { display: block; }
+  #netbanner .dot { font-weight: 400; }
+
   #drop {
-    margin-top: 18px; border: 2px dashed var(--line); border-radius: 14px;
+    margin-top: 14px; border: 2px dashed var(--line); border-radius: 14px;
     background: var(--panel); padding: 34px 20px; text-align: center;
     cursor: pointer; transition: border-color .15s, background .15s;
   }
@@ -51,7 +67,21 @@
   .badge.affected { background: rgba(248,113,113,.12); color: var(--bad); border-color: var(--bad); }
   .badge.healthy  { background: rgba(52,211,153,.12); color: var(--good); border-color: var(--good); }
   .badge.waiting  { background: rgba(56,189,248,.12); color: var(--accent); border-color: var(--accent); }
+  .badge.queued   { background: rgba(245,179,1,.12); color: #f5b301; border-color: #f5b301; }
   .meta { font-size: 12.5px; color: var(--muted); }
+
+  /* Offline advisory panel (rendered from the cached bundle) */
+  #adv { display: none; margin-top: 12px; border-top: 1px solid var(--line); padding-top: 12px; }
+  #adv h3 { margin: 0 0 6px; font-size: 15px; color: var(--text); }
+  #adv .tagline { color: var(--muted); font-size: 12.5px; margin: 0 0 10px; }
+  #adv h4 { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  #adv ul { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.55; }
+  #adv .ref {
+    margin-top: 10px; background: rgba(245,179,1,.1); border: 1px solid #f5b301;
+    color: #f5b301; border-radius: 10px; padding: 9px 12px; font-size: 13px;
+  }
+  #adv select { margin-top: 10px; font: inherit; font-size: 13px; background: var(--panel2);
+                color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
 
   ul#detlist { list-style: none; margin: 10px 0 0; padding: 0; }
   ul#detlist li {
@@ -60,7 +90,6 @@
   }
   .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
   .conf { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .nobar { margin-left: auto; }
 
   .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
   button, .linkbtn {
@@ -84,8 +113,40 @@
     animation: spin .8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Pending (offline) scans */
+  #pending { display: none; margin-top: 16px; }
+  #pending .item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    margin-bottom: 6px; font-size: 13px;
+  }
+  #pending .item img { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+  #pending .item .when { color: var(--muted); font-size: 12px; }
+  #pending .item button { margin-left: auto; }
+
   footer { margin-top: 28px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+  #installBtn { display: none; }
 </style>
+<script>
+(function () {
+  "use strict";
+  // --- Reticle dev verification SDK (localhost-only, inert elsewhere) ---
+  // Vendored from @reticlehq/browser@2.13.1 — see docs.reticle.sh. Loads only
+  // when the app itself is opened on this machine for development; the PWA on
+  // a phone or LAN device never connects.
+  if (["127.0.0.1", "localhost", "[::1]"].includes(window.location.hostname)) {
+    const s = document.createElement("script");
+    s.type = "module";
+    s.textContent = [
+      "import { reticle } from \"/vendor/reticle.js\";",
+      "reticle.connect({ token: \"5fb9dc00f98247ef38e8734b2324e2c0f443a7c0014d1b22\", projectId: \"default\", captureNetworkBodies: true });",
+      "window.__reticleSignal = (name, data) => reticle.signal(name, data);",
+    ].join("\n");
+    document.head.appendChild(s);
+  }
+})();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -94,10 +155,12 @@
     <span class="api">API <code>POST /api/detect</code></span>
   </header>
 
+  <div id="netbanner">📡 Offline mode — scans will be saved and synced when you're back online <span class="dot"></span></div>
+
   <div id="drop">
-    <input type="file" id="file" accept="image/*">
-    <div class="big">Click or drag a crop photo here</div>
-    <div class="hint">JPG / PNG / WEBP up to 20 MB — the model scans it for pests &amp; diseases</div>
+    <input type="file" id="file" data-testid="scan-file-input" accept="image/*" capture="environment">
+    <div class="big">Click, drag, or take a crop photo</div>
+    <div class="hint">JPG / PNG / WEBP up to 20 MB — works offline too: scans sync automatically later</div>
   </div>
 
   <div id="error"></div>
@@ -106,27 +169,63 @@
   <section id="result" class="row">
     <div class="card">
       <div class="badge-row">
-        <span id="badge" class="badge">—</span>
+        <span id="badge" class="badge" data-testid="scan-status">—</span>
         <span id="meta" class="meta"></span>
       </div>
       <div class="stage">
         <img id="stage" alt="uploaded crop photo">
         <canvas id="canvas"></canvas>
       </div>
+
+      <!-- Offline advisory from the cached bundle -->
+      <div id="adv">
+        <h3 id="advName"></h3>
+        <p class="tagline" id="advTag"></p>
+        <h4>Management (IPM)</h4><ul id="advMgmt"></ul>
+        <h4>Safe pesticide use</h4><ul id="advSafety"></ul>
+        <div id="advRef" class="ref" style="display:none"></div>
+        <div>
+          <label for="advLang" style="font-size:12px;color:var(--muted)">Language:</label>
+          <select id="advLang"></select>
+        </div>
+      </div>
+
       <div class="actions">
         <button id="again" class="secondary">Scan another photo</button>
         <a id="annotated-link" class="linkbtn secondary" target="_blank" rel="noopener">View server-annotated image ↗</a>
       </div>
     </div>
+
     <div class="card">
       <h2>Detections</h2>
       <p id="nodets" style="color:var(--muted);font-size:13.5px;margin:0;">No detections above the confidence threshold.</p>
-      <ul id="detlist"></ul>
+      <ul id="detlist" data-testid="detection-list"></ul>
     </div>
   </section>
 
+  <section id="pending" class="card">
+    <h2>⏳ Waiting to sync</h2>
+    <p style="color:var(--muted);font-size:13px;margin:0 0 10px;">
+      These scans were taken offline and will sync automatically when internet returns.
+      <button id="syncNow" data-testid="sync-now" class="secondary" style="margin-left:6px;">Try syncing now</button>
+    </p>
+    <div id="pendingList"></div>
+  </section>
+
+  <section id="installCard" class="card" style="display:none; margin-top:16px;">
+    <h2>📲 Install as an app</h2>
+    <p id="installIos" style="display:none; color:var(--muted); font-size:13.5px; margin:0 0 10px;">
+      On iPhone: tap <strong>Share</strong> → <strong>Add to Home Screen</strong>.
+    </p>
+    <p id="installAndroidText" style="display:none; color:var(--muted); font-size:13.5px; margin:0 0 10px;">
+      Install Crop Doctor on this device for full-screen, offline-capable use.
+    </p>
+    <button id="installBtn">Install app</button>
+  </section>
+
   <footer>
-    Status: <span id="modelnote">checking…</span>
+    Status: <span id="modelnote">checking…</span><br>
+    Offline bundle: <span id="bundlenote">not loaded</span>
   </footer>
 </div>
 
@@ -146,9 +245,15 @@
   const nodets = document.getElementById("nodets");
   const annotatedLink = document.getElementById("annotated-link");
   const modelnote = document.getElementById("modelnote");
+  const bundlenote = document.getElementById("bundlenote");
+  const netbanner = document.getElementById("netbanner");
+  const pendingSection = document.getElementById("pending");
+  const pendingList = document.getElementById("pendingList");
+  const advBox = document.getElementById("adv");
+  const advLang = document.getElementById("advLang");
   const MAX_MB = 20;
 
-  // ---- helpers -----------------------------------------------------------
+  // ------------------------------------------------------------ helpers --
   function colorFor(name) {
     let h = 0;
     for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
@@ -167,8 +272,173 @@
     drop.style.opacity = on ? 0.45 : 1;
     drop.style.pointerEvents = on ? "none" : "auto";
   }
+  function esc(s) {
+    const div = document.createElement("div");
+    div.textContent = s == null ? "" : String(s);
+    return div.innerHTML;
+  }
 
-  // ---- file picking ------------------------------------------------------
+  // -------------------------------------------------- service worker ----
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.addEventListener("message", (ev) => {
+      if (ev.data && ev.data.type === "scan-synced") {
+        if (window.__reticleSignal) {
+          window.__reticleSignal("scan:synced", {
+            id: ev.data.id,
+            status: ev.data.scan && ev.data.scan.status,
+          });
+        }
+        refreshPending();
+      }
+    });
+  }
+
+  // ------------------------------------------------- offline database ----
+  const DB = {
+    db: null,
+    open() {
+      if (this.db) return Promise.resolve(this.db);
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open("crop-doctor", 1);
+        req.onupgradeneeded = () => {
+          if (!req.result.objectStoreNames.contains("scans")) {
+            req.result.createObjectStore("scans", { keyPath: "id" });
+          }
+        };
+        req.onsuccess = () => { this.db = req.result; resolve(req.result); };
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async put(entry) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction("scans", "readwrite");
+        tx.objectStore("scans").put(entry);
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    },
+    async all() {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction("scans", "readonly");
+        const rq = tx.objectStore("scans").getAll();
+        rq.onsuccess = () => res(rq.result || []); rq.onerror = () => rej(rq.error);
+      });
+    },
+    async del(id) {
+      const db = await this.open();
+      return new Promise((res, rej) => {
+        const tx = db.transaction("scans", "readwrite");
+        tx.objectStore("scans").delete(id);
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+    },
+  };
+
+  // ------------------------------------------------- offline bundle ----
+  let BUNDLE = null;
+  async function loadBundle() {
+    try {
+      const resp = await fetch("/api/offline/bundle");
+      if (!resp.ok) throw new Error(String(resp.status));
+      BUNDLE = await resp.json();
+      bundlenote.textContent = "cached (v" + BUNDLE.version + ") — advisories available offline";
+    } catch (err) {
+      // Cache fallback comes from the service worker; if we get here there is
+      // genuinely no bundle yet.
+      bundlenote.textContent = "unavailable (connect once to download)";
+    }
+  }
+
+  function advisoryFor(className, lang) {
+    if (!BUNDLE) return null;
+    const targets = BUNDLE.advisories.targets || {};
+    const key = String(className || "").trim().toLowerCase().replace(/[-\s]/g, "_");
+    const entry = targets[key];
+    if (!entry) return null;
+    const langs = BUNDLE.advisories.languages || ["en"];
+    const code = langs.includes(lang) ? lang : (BUNDLE.advisories.default_language || "en");
+    const content = entry[code] || entry[BUNDLE.advisories.default_language || "en"] || {};
+    return { key, code, content, entry, langs };
+  }
+
+  function renderAdvisory(className, confidence) {
+    const cur = advLang.value || (BUNDLE && BUNDLE.advisories.default_language) || "en";
+    const a = advisoryFor(className, cur);
+    if (!a) { advBox.style.display = "none"; return; }
+    const c = a.content || {};
+    document.getElementById("advName").textContent = c.name || a.key;
+    document.getElementById("advTag").textContent =
+      "Offline advisory · " + a.code.toUpperCase() + (confidence != null ? " · confidence " + Math.round(confidence * 100) + "%" : "");
+    document.getElementById("advMgmt").innerHTML = (c.management || []).map((s) => "<li>" + esc(s) + "</li>").join("");
+    document.getElementById("advSafety").innerHTML = (c.safety || []).map((s) => "<li>" + esc(s) + "</li>").join("");
+    const refBox = document.getElementById("advRef");
+    const needRef =
+      (confidence != null && confidence < (BUNDLE.advisories.referral_threshold || 0.5)) ||
+      BUNDLE.advisories.referral == null;
+    const ref = (BUNDLE.advisories.referral || {})[a.code] || (BUNDLE.advisories.referral || {}).en;
+    if (ref && (needRef || confidence == null)) {
+      refBox.innerHTML = "<strong>" + esc(ref.title) + "</strong><br>" + esc(ref.text);
+      refBox.style.display = "block";
+    } else {
+      refBox.style.display = "none";
+    }
+    advLang.innerHTML = a.langs.map((l) => '<option value="' + l + '"' + (l === a.code ? " selected" : "") + ">" + l.toUpperCase() + "</option>").join("");
+    advBox.style.display = "block";
+  }
+  advLang.addEventListener("change", () => {
+    const name = detlist.querySelector(".adv-class");
+    renderAdvisory(name ? name.dataset.cls : "", null);
+  });
+
+  // ------------------------------------------------- connectivity ----
+  function netBanner() {
+    const off = !navigator.onLine;
+    netbanner.classList.toggle("offline", off);
+  }
+  window.addEventListener("online", () => { netBanner(); nudgeSync(); });
+  window.addEventListener("offline", netBanner);
+  netBanner();
+
+  // ------------------------------------------------- pending queue UI ----
+  async function refreshPending() {
+    let items = [];
+    try { items = await DB.all(); } catch (e) { items = []; }
+    if (!items.length) {
+      pendingList.innerHTML = ""; // clear stale rows from a previous render
+      pendingSection.style.display = "none";
+      return;
+    }
+    pendingSection.style.display = "block";
+    pendingList.innerHTML = "";
+    for (const it of items.slice().reverse()) {
+      const row = document.createElement("div");
+      row.className = "item";
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(new Blob([it.bytes], { type: it.mime }));
+      const info = document.createElement("div");
+      info.innerHTML = "<strong>" + esc(it.filename) + "</strong><br>" +
+        '<span class="when">' + esc(new Date(it.created_at).toLocaleString()) +
+        (it.fields && it.fields.crop ? " · " + esc(it.fields.crop) : "") + "</span>";
+      const btn = document.createElement("button");
+      btn.className = "secondary";
+      btn.textContent = "Delete";
+      btn.addEventListener("click", async () => { await DB.del(it.id); refreshPending(); });
+      row.append(img, info, btn);
+      pendingList.appendChild(row);
+    }
+  }
+
+  function nudgeSync() {
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage("replay-now");
+    }
+    setTimeout(refreshPending, 2500);
+  }
+  document.getElementById("syncNow").addEventListener("click", nudgeSync);
+
+  // ------------------------------------------------- file picking ----
   function pick(file) {
     clearError();
     if (!file) return;
@@ -187,20 +457,75 @@
     result.style.display = "none"; fileInput.value = ""; drop.style.display = ""; drop.style.opacity = "";
   });
 
-  // ---- scan + draw -------------------------------------------------------
+  // ------------------------------------------------- scan + draw ----
   async function runScan(file) {
     clearError(); setBusy(true);
     const fd = new FormData();
     fd.append("file", file);
     try {
       const resp = await fetch("/api/detect", { method: "POST", body: fd });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(detailText(data));
-      drawResult(file, data);
+      if (resp.status === 0) throw { offline: true };
+      const data = await resp.json().catch(() => null);
+      if (data && data.queued === "fallback") {
+        // The service worker saw a network failure but couldn't stash the
+        // scan itself — the page stores it instead.
+        await queueScan(file, {});
+        showQueued(file, null);
+      } else if (data && data.queued) {
+        showQueued(file, data.message);
+      } else {
+        if (!resp.ok) { showError(detailText(data)); setBusy(false); return; }
+        drawResult(file, data);
+      }
     } catch (err) {
-      showError(err && err.message ? err.message : "Network error — is the API running?");
-      setBusy(false);
+      // fetch() itself threw — no service worker answered (offline or server
+      // down). Queue locally first; only surface an error if even that fails.
+      try {
+        await queueScan(file, {});
+        showQueued(file, null);
+      } catch (e2) {
+        showError("Offline and could not save the scan locally.");
+        setBusy(false);
+      }
     }
+  }
+
+  async function queueScan(file, fields) {
+    const entry = {
+      id: "scan-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+      created_at: new Date().toISOString(),
+      filename: file.name || "photo.jpg",
+      mime: file.type || "image/jpeg",
+      bytes: await file.arrayBuffer(),
+      fields: fields || {},
+    };
+    await DB.put(entry);
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage("replay-now");
+    }
+  }
+
+  function showQueued(file, message) {
+    result.style.display = "flex";
+    drop.style.display = "none";
+    const url = URL.createObjectURL(file);
+    imgEl.onload = () => {
+      canvas.width = imgEl.naturalWidth; canvas.height = imgEl.naturalHeight;
+      canvas.getContext("2d").drawImage(imgEl, 0, 0);
+      URL.revokeObjectURL(url);
+    };
+    imgEl.src = url;
+    badge.className = "badge queued";
+    badge.textContent = "⏳ Saved for sync";
+    if (window.__reticleSignal) {
+      window.__reticleSignal("scan:queued", { filename: file.name });
+    }
+    meta.textContent = message || "Will sync automatically when online";
+    detlist.innerHTML = ""; nodets.style.display = "none";
+    annotatedLink.style.display = "none";
+    advBox.style.display = "none";
+    setBusy(false);
+    refreshPending();
   }
 
   async function drawResult(file, data) {
@@ -249,6 +574,8 @@
         sw.style.background = "hsl(" + colorFor(d.class_name) + " 85% 55%)";
         const name = document.createElement("span");
         name.textContent = d.class_name;
+        name.className = "adv-class";
+        name.dataset.cls = d.class_name;
         const conf = document.createElement("span");
         conf.className = "conf";
         conf.textContent = Math.round(d.confidence * 100) + "%";
@@ -258,8 +585,26 @@
 
       meta.textContent = "model " + data.model_version + " · " + data.image_width + "×" + data.image_height +
         " · scan #" + data.id;
+      // Reticle signal: the app asserts its own outcome (strongest evidence).
+      if (window.__reticleSignal) {
+        window.__reticleSignal("scan:result", {
+          status: data.status,
+          detections: dets.length,
+          scanId: data.id,
+          top: dets.length ? dets[0].class_name : null,
+        });
+      }
       annotatedLink.href = data.annotated_url || "#";
       annotatedLink.style.display = data.annotated_url ? "" : "none";
+
+      // Offline advisory for the top detection (works with zero network once
+      // the bundle is cached).
+      if (BUNDLE && dets.length) {
+        renderAdvisory(dets[0].class_name, dets[0].confidence);
+      } else if (!dets.length) {
+        advBox.style.display = "none";
+      }
+
       URL.revokeObjectURL(url);
       setBusy(false);
     };
@@ -269,8 +614,36 @@
 
   // Expose for tests / console: window.__scan(file)
   window.__scan = runScan;
+  window.__pendingCount = async () => (await DB.all()).length;
 
-  // ---- health note -------------------------------------------------------
+  // ------------------------------------------------- install prompt ----
+  let deferredPrompt = null;
+  const installCard = document.getElementById("installCard");
+  const installBtn = document.getElementById("installBtn");
+  const iosHint = document.getElementById("installIos");
+  const androidText = document.getElementById("installAndroidText");
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installCard.style.display = "block";
+    androidText.style.display = "block";
+    installBtn.style.display = "inline-block";
+  });
+  installBtn.addEventListener("click", async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installCard.style.display = "none";
+  });
+  if (!standalone) {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS) { installCard.style.display = "block"; iosHint.style.display = "block"; }
+  }
+
+  // ------------------------------------------------- health note ----
   fetch("/api/health")
     .then((r) => r.json())
     .then((h) => {
@@ -280,7 +653,10 @@
             : "custom model loaded — " + h.model_version)
         : "model not loaded: " + (h.error || "unknown");
     })
-    .catch(() => { modelnote.textContent = "API unreachable — is the server running?"; });
+    .catch(() => { modelnote.textContent = "offline — using cached data"; });
+
+  loadBundle();
+  refreshPending();
 })();
 </script>
 </body>

@@ -60,11 +60,27 @@ if settings.cors_origins:
     )
 
 # Imported after app creation to avoid circular imports.
-from .routers import detect, info, scans  # noqa: E402
+from .routers import (  # noqa: E402
+    advisories,
+    detect,
+    insights,
+    info,
+    offline,
+    reports,
+    reviews,
+    risk,
+    scans,
+)
 
 app.include_router(detect.router)
 app.include_router(scans.router)
 app.include_router(info.router)
+app.include_router(risk.router)
+app.include_router(advisories.router)
+app.include_router(reports.router)
+app.include_router(reviews.router)
+app.include_router(insights.router)
+app.include_router(offline.router)
 
 # Serve the upload UI at the root. Routers above are registered first, so all
 # /api, /docs and /openapi.json routes keep precedence over this catch-all.

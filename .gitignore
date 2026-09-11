@@ -28,3 +28,6 @@ runs/
 .coverage
 htmlcov/
 .freebuff/
+
+# Reticle local tooling (Node runtime, npm sdk, bundler) — not part of the app
+.reticle-tools/

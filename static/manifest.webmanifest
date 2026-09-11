@@ -1,0 +1,28 @@
+{
+  "name": "Crop Doctor — Pest & Disease Detector",
+  "short_name": "Crop Doctor",
+  "description": "Detect crop pests and diseases from photos, get weather-based risk forecasts and multilingual advisories. Works offline.",
+  "id": "crop-pest-detection",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f1720",
+  "theme_color": "#0f1720",
+  "lang": "en",
+  "categories": ["agriculture", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

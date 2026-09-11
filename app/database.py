@@ -1,10 +1,13 @@
 """SQLAlchemy engine/session setup backed by SQLite."""
+import logging
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from .config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -40,6 +43,37 @@ def init_db() -> None:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _migrate_sqlite(engine)
+
+
+def _migrate_sqlite(engine) -> None:
+    """Lightweight column additions for DBs created by older versions.
+
+    SQLite's ALTER TABLE ADD COLUMN is cheap, so we patch existing tables
+    instead of requiring a throwaway database. New deployments get the
+    columns from create_all() and every statement below becomes a no-op.
+    """
+    if not settings.database_url.startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    additions = {
+        "scans": [
+            ("latitude", "FLOAT"),
+            ("longitude", "FLOAT"),
+            ("location_name", "VARCHAR(255)"),
+            ("crop", "VARCHAR(100)"),
+            ("crop_stage", "VARCHAR(50)"),
+        ],
+    }
+    with engine.begin() as conn:
+        for table, columns in additions.items():
+            if table not in inspector.get_table_names():
+                continue
+            existing = {c["name"] for c in inspector.get_columns(table)}
+            for name, ddl in columns:
+                if name not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                    logger.info("Migrated %s: added column %s", table, name)
 
 
 def get_db():

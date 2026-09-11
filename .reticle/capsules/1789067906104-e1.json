@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "id": "1789067906104-e1",
+  "createdAt": 1789067906104,
+  "origin": "failed-assert",
+  "expected": "signal scan:result",
+  "observed": "signal \"scan:result\" never fired",
+  "steps": [
+    {
+      "tool": "reticle_act",
+      "anchor": {
+        "kind": "testid",
+        "value": "scan-file-input"
+      },
+      "action": "upload"
+    }
+  ]
+}

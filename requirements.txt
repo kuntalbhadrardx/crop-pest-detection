@@ -10,3 +10,7 @@ pydantic-settings>=2.2
 Pillow>=10.0
 ultralytics>=8.2
 roboflow>=1.1.39
+
+# --- Streamlit frontend (calls the API; no ML stack needed) ---
+streamlit>=1.52
+requests>=2.31
